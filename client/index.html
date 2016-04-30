@@ -40,9 +40,6 @@ body {
       </style>
   </head>
   <body>
-
-
-
     <div class="container">
 
       <form class="form-details" method="post">
@@ -71,6 +68,85 @@ body {
       </form>
 
     </div> <!-- /container -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js"></script>
+    <script>
+      (function() {
+        var startTime = undefined;
+        var inputIdsWithPasteEvents = {};
+        var getSessionId = function() { return "123123-123123-123123123" };
+        var getWindowDimension = function() {
+          return {
+            width: window.innerWidth.toString(),
+            height: window.innerHeight.toString()
+          }
+        };
+        var sendEventData = function(eventData) {
+          var eventDataWithMeta = $.extend({
+            sessionId: getSessionId(),
+            websiteUrl: window.location.href,
+          }, eventData);
 
+          $.ajax("http://localhost:8080/formEvent", {
+            data: JSON.stringify(eventDataWithMeta),
+            crossDomain: true,
+            method: "POST",
+          });
+        };
+        var prevWindowDimensions = getWindowDimension();
+        var initializeStartTime = function() {
+          if(!startTime) {
+            startTime = new Date();
+          }
+        };
+        var form = $(".form-details");
+
+        // Events
+        $(window).on("resize", function(event) {
+          var newWindowDimension = getWindowDimension();
+          sendEventData({
+            eventType: "resize",
+            resizeFrom: prevWindowDimensions,
+            resizeTo: newWindowDimension
+          });
+        });
+
+        form.on("paste", function(event) {
+          initializeStartTime();
+          var inputId = event.target.id;
+          inputIdsWithPasteEvents[inputId] = true;
+          sendEventData({
+            eventType: "copyAndPaste",
+            inputId: inputId,
+            pasted: true
+          });
+        });
+
+        form.on("keydown", function(event) {
+          initializeStartTime();
+        });
+
+        form.find("input").on("focusout", function(event) {
+          var inputId = event.target.id;
+          
+          // if there is no previous paste events for this id, 
+          // we assume that this a legit fill
+          if (!inputIdsWithPasteEvents[inputId]) {
+            sendEventData({
+              eventType: "copyAndPaste",
+              inputId: inputId,
+              pasted: false
+            });
+          }
+        });
+
+        form.on("submit", function(event) {
+          sendEventData({
+            eventType: "timeTaken",
+            time: Math.ceil(((new Date())-startTime)/1000)
+          });
+        });
+
+      })()
+    </script>
   </body>
 </html>
